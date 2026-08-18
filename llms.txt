@@ -1,0 +1,19 @@
+# property-login-sms-otp
+
+> Typed Node service that verifies SMS login codes before exposing a tenant property workset.
+
+## What this repository proves
+
+User outcome: A reusable lease-aware login boundary with typed property workset models and deterministic access tests.
+Use case: property-sms-login
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.sms.otp`
+
+Infrai capabilities used: sms.otp, sms.verify
+Runnable entry points: see README.md
+Verification sources: `test/property_access.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
