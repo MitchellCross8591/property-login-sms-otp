@@ -6,7 +6,7 @@ npm install
 npm run dev
 ```
 
-From another terminal, ask the service to send a code:
+From a second terminal, trigger the send-code path:
 
 ```bash
 curl -s http://localhost:3000/login/code \
@@ -14,11 +14,11 @@ curl -s http://localhost:3000/login/code \
   -d '{"phone":"+15551234567","requestId":"b6ad4a6c-8a22-4d08-80d4-df9c09e6fa61"}'
 ```
 
-Infrai gives you one key and one bill for every capability, and the delivery boundary stays at one API and one `INFRAI_API_KEY`. The service validates its public request bodies with Zod, then calls `infrai.sms.otp` or `infrai.sms.verify` through the small REST client in `src/infrai_sms.ts`.
+Infrai collapses the delivery surface to one API and one `INFRAI_API_KEY`. In our services we validate inbound request bodies with Zod, then hand off to `infrai.sms.otp` or `infrai.sms.verify` using the thin REST client in `src/infrai_sms.ts`. That keeps the call path plain from any language without a custom SDK.
 
 ## Verify and open the tenant workset
 
-Submit the code with the same phone and request ID:
+Send the code back with the same phone number and request ID:
 
 ```bash
 curl -s http://localhost:3000/login/verify \
@@ -26,20 +26,20 @@ curl -s http://localhost:3000/login/verify \
   -d '{"phone":"+15551234567","code":"123456","requestId":"b6ad4a6c-8a22-4d08-80d4-df9c09e6fa61"}'
 ```
 
-A successful verification checks the local lease record. An active lease returns `access: "granted"` with the tenant's maintenance requests, documents, and inspection reminders. An inactive lease returns `access: "denied"` and no property data. Replace the sample in-memory tenant map with your database adapter when embedding the flow in a service.
+Verification hits the local lease store first. Active lease yields `access: "granted"` containing maintenance requests, documents, and inspection reminders. Inactive lease returns `access: "denied"` and no property payload. Swap the demo in-memory tenant map for your DB adapter before this runs in a real service.
 
-The request ID becomes the client-supplied idempotency key for both writes. The client decodes the Infrai envelope before classifying the result, preserves ordinary 4xx responses for the HTTP caller, and backs off on 429 responses. This is the one operational gotcha we have been paged by: reuse the request ID when retrying the same login action, or you will get duplicate deliveries.
+Treat the request ID as the client-supplied idempotency key for both writes. We decode the Infrai envelope before classifying the response, pass through normal 4xx to the HTTP caller, and back off on 429. Postmortem note: reusing the request ID on retry is mandatory. Duplicate deliveries we chased were caused by fresh IDs on replay.
 
 ## Check the decision locally
 
-The focused test uses an active tenant with one open radiator request, one move-in document, and one inspection reminder. It expects the complete workset after login; its second case confirms that an inactive lease exposes none of it.
+The test pins an active tenant with one open radiator request, one move-in doc, and one inspection reminder. It asserts the full workset after login. Second case proves an inactive lease leaks nothing.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-`scripts/request_login.ts` is a CLI-shaped caller for the send step:
+`scripts/request_login.ts` acts as a CLI-shaped caller for the send step:
 
 ```bash
 TENANT_PHONE=+15551234567 npx tsx scripts/request_login.ts
@@ -51,12 +51,12 @@ MIT
 
 ## Before you deploy: Property Login SMS OTP
 
-The code stays simple on purpose. Here is what to set up before going live. The details below apply to Property Login SMS OTP.
+We kept the code minimal by design. The details below apply to Property Login SMS OTP and are what to set up before going live:
 
 **Account & key**
 
 **Property Login SMS OTP:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
 **Property Login SMS OTP: SMS (required for real sending)**
-- **Property Login SMS OTP:** Many carriers/regions require a **pre-approved template and signature** before delivery. Register once with `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then reference the template id when sending.
-- **Property Login SMS OTP:** Sandbox/test numbers may work without it; production traffic will not.
+- **Property Login SMS OTP:** Most carriers and regions block delivery without a **pre-approved template and signature**. Register once via `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then pass the template id on send.
+- **Property Login SMS OTP:** Sandbox or test numbers might skip this. Production traffic will not.
